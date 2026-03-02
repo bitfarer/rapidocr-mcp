@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  rapidocr-mcp:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - RAPIDOCR_LOG_LEVEL=INFO
+      - RAPIDOCR_LANG=ch
+      - RAPIDOCR_ENABLE_CORS=true
+      - RAPIDOCR_ENABLE_METRICS=true
+    volumes:
+      - ./data:/data
+      - rapidocr_cache:/app/.cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  rapidocr-stdio:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    command: python -m rapidocr_mcp --mode stdio
+    volumes:
+      - ./data:/data
+    restart: on-failure
+
+volumes:
+  rapidocr_cache:
