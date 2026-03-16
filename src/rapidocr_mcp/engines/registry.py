@@ -1,9 +1,8 @@
 """OCR Engine plugins - Multi-engine support."""
 
 from abc import ABC, abstractmethod
+from importlib.util import find_spec
 from typing import Any
-import numpy as np
-from PIL import Image
 
 
 class OCREngine(ABC):
@@ -37,12 +36,7 @@ class RapidOCRPlugin(OCREngine):
         self._config = config
 
     def available(self) -> bool:
-        try:
-            from rapidocr_onnxruntime import RapidOCR
-
-            return True
-        except ImportError:
-            return False
+        return find_spec("rapidocr_onnxruntime") is not None
 
     def __call__(self, image: Any) -> tuple[list, float]:
         from rapidocr_onnxruntime import RapidOCR
@@ -115,4 +109,4 @@ def get_engine(name: str, **config) -> OCREngine:
 
 def list_available_engines() -> dict[str, bool]:
     """List all available engines."""
-    return {name: engine_class.available() for name, engine_class in ENGINES.items()}
+    return {name: engine_class().available() for name, engine_class in ENGINES.items()}

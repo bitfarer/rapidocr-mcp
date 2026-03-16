@@ -1,23 +1,26 @@
 """FastAPI Server with multiple transport protocols."""
 
-import asyncio
-import base64
+import time
 from contextlib import asynccontextmanager
-from typing import Any, Annotated
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
-from loguru import logger
+from typing import Annotated, Any
+
 import uvicorn
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from loguru import logger
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from ..config import settings
 from ..core.ocr_service import ocr_service
+from ..monitoring.metrics import ocr_latency, ocr_requests_total
+from ..monitoring.tracing import init_tracing, tracer
+from ..security.auth import verify_api_key
 from ..utils.image import bytes_to_pil, preprocess_image
 from ..utils.output_formatter import format_output
 from ..utils.url_downloader import url_downloader
-from ..monitoring.metrics import metrics_server, ocr_requests_total, ocr_latency
-from ..monitoring.tracing import tracer, init_tracing
-from ..security.auth import verify_api_key, AuditLogger
+
+UploadedImage = Annotated[UploadFile, File(...)]
 
 
 class OCRRequest:
@@ -84,7 +87,6 @@ async def ocr_by_path(
     api_key: str | None = Depends(get_optional_api_key),
 ) -> Any:
     """OCR by file path."""
-    import time
     from pathlib import Path
 
     with tracer.start_as_current_span("ocr_by_path") as span:
@@ -108,10 +110,12 @@ async def ocr_by_path(
             ocr_requests_total.labels(method="path", status="success").inc()
 
             return format_output(results, output_format)
+        except HTTPException:
+            raise
         except Exception as e:
             ocr_requests_total.labels(method="path", status="error").inc()
             logger.error(f"OCR error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/ocr/base64")
@@ -124,10 +128,9 @@ async def ocr_by_base64(
     api_key: str | None = Depends(get_optional_api_key),
 ) -> Any:
     """OCR by base64 image."""
-    import time
     from ..utils.image import base64_to_pil
 
-    with tracer.start_as_current_span("ocr_by_base64") as span:
+    with tracer.start_as_current_span("ocr_by_base64"):
         start = time.perf_counter()
 
         try:
@@ -140,10 +143,12 @@ async def ocr_by_base64(
             ocr_requests_total.labels(method="base64", status="success").inc()
 
             return format_output(results, output_format)
+        except HTTPException:
+            raise
         except Exception as e:
             ocr_requests_total.labels(method="base64", status="error").inc()
             logger.error(f"OCR error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/ocr/url")
@@ -157,8 +162,6 @@ async def ocr_by_url(
     api_key: str | None = Depends(get_optional_api_key),
 ) -> Any:
     """OCR by image URL."""
-    import time
-
     with tracer.start_as_current_span("ocr_by_url") as span:
         span.set_attribute("url", url)
         start = time.perf_counter()
@@ -174,15 +177,17 @@ async def ocr_by_url(
             ocr_requests_total.labels(method="url", status="success").inc()
 
             return format_output(results, output_format)
+        except HTTPException:
+            raise
         except Exception as e:
             ocr_requests_total.labels(method="url", status="error").inc()
             logger.error(f"OCR error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/ocr/upload")
 async def ocr_upload(
-    file: UploadFile = File(...),
+    file: UploadedImage,
     output_format: str = Form("json"),
     auto_enhance: bool = Form(False),
     rotate: bool = Form(False),
@@ -190,9 +195,7 @@ async def ocr_upload(
     api_key: str | None = Depends(get_optional_api_key),
 ) -> Any:
     """OCR by file upload."""
-    import time
-
-    with tracer.start_as_current_span("ocr_upload") as span:
+    with tracer.start_as_current_span("ocr_upload"):
         start = time.perf_counter()
 
         try:
@@ -214,14 +217,12 @@ async def ocr_upload(
         except Exception as e:
             ocr_requests_total.labels(method="upload", status="error").inc()
             logger.error(f"OCR error: {e}")
-            raise HTTPException(status_code=500, detail=str(e))
+            raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.get("/metrics")
 async def metrics():
     """Prometheus metrics endpoint."""
-    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
-
     return StreamingResponse(
         generate_latest(),
         media_type=CONTENT_TYPE_LATEST,

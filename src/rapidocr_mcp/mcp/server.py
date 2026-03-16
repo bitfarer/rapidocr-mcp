@@ -3,22 +3,23 @@
 import time
 from pathlib import Path
 from typing import Any
-from mcp.server.fastmcp import FastMCP, Context
-from loguru import logger
 
-from ..core.ocr_service import ocr_service
+from loguru import logger
+from mcp.server.fastmcp import Context, FastMCP
+
 from ..config import settings
+from ..core.ocr_service import ocr_service
+from ..monitoring.metrics import ocr_latency, ocr_requests_total
 from ..utils.image import (
     base64_to_pil,
     path_to_pil,
+    preprocess_image,
     validate_image_format,
     validate_image_size,
-    preprocess_image,
 )
 from ..utils.output_formatter import format_output
+from ..utils.rate_limit import concurrent_limiter, rate_limiter
 from ..utils.url_downloader import url_downloader
-from ..utils.rate_limit import rate_limiter, concurrent_limiter
-from ..monitoring.metrics import ocr_requests_total, ocr_latency
 
 mcp = FastMCP("rapidocr-mcp", json_response=True)
 

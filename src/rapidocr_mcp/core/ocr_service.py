@@ -1,9 +1,7 @@
 import time
-from pathlib import Path
 from typing import Any
+
 from loguru import logger
-import numpy as np
-from PIL import Image
 
 from ..config import settings
 

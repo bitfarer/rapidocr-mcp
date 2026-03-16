@@ -5,12 +5,12 @@ import json
 import time
 from pathlib import Path
 from typing import Any
-from fastapi import Request, HTTPException, Security
+
+from fastapi import HTTPException, Security
 from fastapi.security import APIKeyHeader
 from loguru import logger
 
 from ..config import settings
-
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 

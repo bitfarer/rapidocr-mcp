@@ -3,7 +3,6 @@
 import asyncio
 import time
 from collections import deque
-from loguru import logger
 
 from ..config import settings
 

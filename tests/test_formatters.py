@@ -1,12 +1,13 @@
 """Test output formatters."""
 
 import pytest
+
 from rapidocr_mcp.utils.output_formatter import (
-    format_output,
-    PlainFormatter,
     JsonFormatter,
     MarkdownFormatter,
+    PlainFormatter,
     StructuredFormatter,
+    format_output,
 )
 
 

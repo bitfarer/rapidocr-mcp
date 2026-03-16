@@ -1,9 +1,9 @@
 """Test image utilities."""
 
-import pytest
-from PIL import Image
-import io
 import base64
+import io
+
+from PIL import Image
 
 
 class TestImageUtils:
