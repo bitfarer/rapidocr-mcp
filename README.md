@@ -115,6 +115,14 @@ docker-compose -f docker/docker-compose.yml up
 - `POST /ocr/upload` - OCR by file upload
 - `GET /metrics` - Prometheus metrics
 
+## Sponsoring
+
+If you find this project helpful, consider buying me a coffee!
+
+<a href="https://ko-fi.com/bitfarer" target="_blank">
+  <img src="https://img.shields.io/badge/Ko--fi-Buy%20me%20a%20coffee-FF5E5B?logo=ko-fi&logoColor=white&style=for-the-badge" alt="Ko-fi" />
+</a>
+
 ## License
 
 MIT
