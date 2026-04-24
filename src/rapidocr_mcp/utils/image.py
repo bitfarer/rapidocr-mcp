@@ -1,9 +1,9 @@
 import base64
 import io
 from pathlib import Path
-from typing import Any
-from PIL import Image
+
 import numpy as np
+from PIL import Image
 
 
 def base64_to_pil(b64: str) -> Image.Image:

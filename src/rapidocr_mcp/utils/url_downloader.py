@@ -1,10 +1,9 @@
 """URL download and caching utilities."""
 
-import asyncio
 import hashlib
 import time
 from pathlib import Path
-from typing import Any
+
 import httpx
 from loguru import logger
 

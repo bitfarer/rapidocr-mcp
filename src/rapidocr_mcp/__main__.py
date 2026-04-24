@@ -1,7 +1,8 @@
 """Main entry point for RapidOCR MCP Server."""
 
-import sys
 import argparse
+import sys
+
 from loguru import logger
 
 from .config import settings

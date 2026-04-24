@@ -1,25 +1,25 @@
 """MCP Server with FastMCP."""
 
-import asyncio
-import json
+import time
 from pathlib import Path
 from typing import Any
-from mcp.server.fastmcp import FastMCP, Context
-from loguru import logger
 
-from ..core.ocr_service import ocr_service
+from loguru import logger
+from mcp.server.fastmcp import Context, FastMCP
+
 from ..config import settings
+from ..core.ocr_service import ocr_service
+from ..monitoring.metrics import ocr_latency, ocr_requests_total
 from ..utils.image import (
     base64_to_pil,
     path_to_pil,
+    preprocess_image,
     validate_image_format,
     validate_image_size,
-    preprocess_image,
 )
 from ..utils.output_formatter import format_output
+from ..utils.rate_limit import concurrent_limiter, rate_limiter
 from ..utils.url_downloader import url_downloader
-from ..utils.rate_limit import rate_limiter, concurrent_limiter
-from ..monitoring.metrics import ocr_requests_total, ocr_latency
 
 mcp = FastMCP("rapidocr-mcp", json_response=True)
 
@@ -60,15 +60,18 @@ async def ocr_by_path(
     if not validate_image_size(image_path, settings.max_image_size):
         raise ValueError(f"Image too large: {Path(image_path).stat().st_size} bytes")
 
+    start = time.perf_counter()
     await concurrent_limiter.acquire()
     try:
         img = path_to_pil(image_path)
         img = preprocess_image(img, auto_enhance, rotate, binarize)
         results = ocr_service.ocr(img)
-        ocr_requests_total.labels(method="path").inc()
+        ocr_latency.labels(method="path").observe(time.perf_counter() - start)
+        ocr_requests_total.labels(method="path", status="success").inc()
         return format_output(results, output_format)
     except Exception as e:
         logger.error(f"OCR error: {e}")
+        ocr_requests_total.labels(method="path", status="error").inc()
         raise
     finally:
         concurrent_limiter.release()
@@ -101,15 +104,18 @@ async def ocr_by_content(
     if settings.enable_rate_limit:
         await rate_limiter.wait_and_acquire()
 
+    start = time.perf_counter()
     with concurrent_limiter:  # type: ignore[misc]
         try:
             img = base64_to_pil(image_base64)
             img = preprocess_image(img, auto_enhance, rotate, binarize)
             results = ocr_service.ocr(img)
-            ocr_requests_total.labels(method="content").inc()
+            ocr_latency.labels(method="content").observe(time.perf_counter() - start)
+            ocr_requests_total.labels(method="content", status="success").inc()
             return format_output(results, output_format)
         except Exception as e:
             logger.error(f"OCR base64 error: {e}")
+            ocr_requests_total.labels(method="content", status="error").inc()
             raise
 
 
@@ -142,6 +148,7 @@ async def ocr_by_url(
     if settings.enable_rate_limit:
         await rate_limiter.wait_and_acquire()
 
+    start = time.perf_counter()
     with concurrent_limiter:  # type: ignore[misc]
         try:
             data = await url_downloader.download(image_url, use_cache)
@@ -150,10 +157,12 @@ async def ocr_by_url(
             img = bytes_to_pil(data)
             img = preprocess_image(img, auto_enhance, rotate, binarize)
             results = ocr_service.ocr(img)
-            ocr_requests_total.labels(method="url").inc()
+            ocr_latency.labels(method="url").observe(time.perf_counter() - start)
+            ocr_requests_total.labels(method="url", status="success").inc()
             return format_output(results, output_format)
         except Exception as e:
             logger.error(f"OCR URL error: {e}")
+            ocr_requests_total.labels(method="url", status="error").inc()
             raise
 
 
@@ -186,6 +195,7 @@ async def ocr_batch(
 
     all_results = []
 
+    start = time.perf_counter()
     await concurrent_limiter.acquire()
     try:
         for image_path in image_paths:
@@ -204,7 +214,8 @@ async def ocr_batch(
     finally:
         concurrent_limiter.release()
 
-    ocr_requests_total.labels(method="batch").inc()
+    ocr_latency.labels(method="batch").observe(time.perf_counter() - start)
+    ocr_requests_total.labels(method="batch", status="success").inc()
 
     if output_format == "structured":
         return {

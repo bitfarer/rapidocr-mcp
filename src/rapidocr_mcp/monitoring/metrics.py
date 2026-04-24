@@ -1,8 +1,7 @@
 """Monitoring and metrics."""
 
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
-from typing import Any
-import time
+
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 
 from rapidocr_mcp.config import settings
 

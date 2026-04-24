@@ -1,7 +1,7 @@
 """Output formatters for OCR results."""
 
-from typing import Any
 import json
+from typing import Any
 
 
 class OutputFormatter:

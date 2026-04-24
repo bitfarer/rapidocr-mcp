@@ -1,11 +1,12 @@
 """OpenTelemetry tracing."""
 
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from contextlib import suppress
 from typing import Any
+
+from opentelemetry import trace
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
 
 tracer_provider = TracerProvider(resource=Resource.create({"service.name": "rapidocr-mcp"}))
 trace.set_tracer_provider(tracer_provider)
@@ -16,10 +17,8 @@ tracer = trace.get_tracer(__name__)
 def init_tracing(app: Any = None) -> None:
     """Initialize OpenTelemetry tracing."""
     if app is not None:
-        try:
+        with suppress(Exception):
             FastAPIInstrumentor.instrument_app(app)
-        except Exception:
-            pass
 
 
 class TraceContext:
